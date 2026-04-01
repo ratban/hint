@@ -1,6 +1,6 @@
 <div align="Left">
 
-#<img src="https://raw.githubusercontent.com/ratban/hint/refs/heads/main/assests/Layer%202.png" alt="Hint Language" width="1%" /> Hint
+<img src="https://raw.githubusercontent.com/ratban/hint/refs/heads/main/assests/Layer%202.png" alt="Hint Language" width="2%" /> # Hint
 
 **Code like you think. Run like a machine.**
 
