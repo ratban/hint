@@ -1,4 +1,4 @@
-<div align="Left">
+<div align="Center">
 
 <img src="https://raw.githubusercontent.com/ratban/hint/refs/heads/main/assests/Layer%202.png" alt="Hint Language" width="1.5%" /> Hint
 
