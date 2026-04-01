@@ -1,102 +1,197 @@
-# Hint Compiler (hintc)
+# Hint Compiler
 
-A zero-dependency compiler for the Hint programming language that compiles conversational English directly to native Windows x86_64 executables.
+**Zero-dependency compiler for the Hint programming language.**
 
-## Overview
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/hint-lang/hintc/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](../LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/hint-lang/hintc/ci.yml)](https://github.com/hint-lang/hintc/actions)
 
-The Hint programming language allows you to write programs using natural English sentences. The compiler recognizes three main types of statements:
+---
 
-1. **Say**: Outputs a string to the console
-   - Example: `Say "Hello, world!".`
+## 🚀 Overview
 
-2. **Keep**: Stores a number in memory with a named variable
-   - Example: `Keep the number 42 in mind as the answer.`
+The Hint compiler (`hintc`) compiles Hint source code to:
+- **WebAssembly** (`.wasm`) - For web browsers
+- **Native executables** (`.exe`, ELF, Mach-O) - For Windows, macOS, Linux
 
-3. **Stop**: Terminates the program execution
-   - Example: `Stop the program.`
+**Written in Rust** using the Cranelift code generator.
 
-## Installation
+---
 
-To build and use the Hint compiler, you need:
+## 📦 Installation
 
-- Rust toolchain (rustc, cargo)
-- NASM assembler (https://www.nasm.us/)
-- Microsoft Visual Studio Build Tools (for the linker)
-
-## Building
+### From Source
 
 ```bash
-cd hintc
+git clone https://github.com/hint-lang/hintc.git
+cd hintc/hintc
 cargo build --release
 ```
 
-The executable will be available at `target/release/hintc.exe`.
+The binary will be at `target/release/hintc` (or `hintc.exe` on Windows).
 
-## Usage
+### From npm (Coming Soon)
 
 ```bash
-hintc program.ht          # Compile to program.exe
-hintc program.ht -o out   # Compile to out.exe
-hintc --ast program.ht    # Print AST only
-hintc --tokens program.ht # Print tokens only
-hintc --keep program.ht   # Keep intermediate files
+npm install -g hintc
 ```
 
-## Examples
+---
 
-### Hello World (`hello_world.ht`)
-```
-Say "Hello, World!".
-Stop the program.
-```
+## 🛠️ Usage
 
-### Variable Storage (`variables.ht`)
-```
-Keep the number 42 in mind as the answer.
-Say "The answer is 42.".
-Stop the program.
-```
+### Compile to WASM
 
-## Language Specification
-
-The Hint language is case-insensitive for keywords. The grammar supports:
-
-- `Say "[text]".` - Prints text to standard output
-- `Keep the number [number] in mind as the [name].` - Stores a number in a variable
-- `Stop the program.` - Exits the program with code 0
-
-## Implementation Details
-
-The compiler follows a traditional three-phase approach:
-
-1. **Lexical Analysis**: Converts source text to tokens
-2. **Parsing**: Converts tokens to an Abstract Syntax Tree (AST)
-3. **Code Generation**: Converts AST to x86_64 assembly code
-
-The generated assembly uses the Windows x64 calling convention and links against Windows API functions for console output.
-
-## Troubleshooting
-
-If you encounter the error "NASM not found", you need to install NASM (Netwide Assembler) from https://www.nasm.us/ and ensure it's in your system PATH.
-
-## Development
-
-The compiler includes unit tests that can be run with:
 ```bash
+hintc --target wasm32 input.ht -o output.wasm
+```
+
+### Compile to Native
+
+```bash
+# Windows
+hintc --target native input.ht -o output.exe
+
+# Linux/macOS
+hintc --target native input.ht -o output
+```
+
+### Run REPL
+
+```bash
+hintc --repl
+```
+
+---
+
+## 📁 Project Structure
+
+```
+hintc/
+├── src/
+│   ├── lexer.rs              # Tokenization
+│   ├── parser.rs             # AST generation
+│   ├── semantics/            # Type checking
+│   │   ├── mod.rs
+│   │   ├── types.rs
+│   │   ├── symbols.rs
+│   │   ├── checker.rs
+│   │   └── error.rs
+│   ├── ir/                   # Intermediate representation
+│   │   └── mod.rs
+│   ├── codegen/              # Code generation
+│   │   ├── mod.rs
+│   │   ├── wasm/             # WASM backend
+│   │   └── native/           # Native backend (Cranelift)
+│   ├── stdlib/               # Standard library
+│   │   ├── mod.rs
+│   │   ├── core.rs
+│   │   ├── io.rs
+│   │   ├── net.rs
+│   │   └── wasm.rs
+│   ├── diagnostics/          # Error messages
+│   │   ├── mod.rs
+│   │   ├── diagnostic.rs
+│   │   ├── engine.rs
+│   │   ├── codes.rs
+│   │   ├── suggestions.rs
+│   │   └── render.rs
+│   ├── lsp.rs                # Language server
+│   ├── compiler.rs           # Main compiler
+│   ├── target.rs             # Target abstraction
+│   ├── main.rs               # CLI entry
+│   └── lib.rs                # Library entry
+├── tests/                    # Test files
+├── Cargo.toml                # Dependencies
+└── README.md                 # This file
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
 cargo test
+
+# Run specific test
+cargo test lexer
+
+# Run with output
+cargo test -- --nocapture
 ```
 
-To see the tokenization output:
-```bash
-hintc --tokens program.ht
+### Test Files
+
+Test `.ht` files are in the `tests/` folder:
+- `fibonacci.ht` - Fibonacci sequence
+- `hello_world.ht` - Hello World example
+
+---
+
+## 🏗️ Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed compiler architecture.
+
+### Compilation Pipeline
+
+```
+┌─────────────┐
+│ Source (.ht)│
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    Lexer    │ → Tokens
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Parser    │ → AST
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Semantics  │ → Typed AST
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│     IR      │ → HIR
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Codegen    │ → WASM / Native
+└─────────────┘
 ```
 
-To see the AST output:
-```bash
-hintc --ast program.ht
-```
+---
 
-To keep intermediate files (.asm and .obj):
-```bash
-hintc --keep program.ht
-```
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [README.md](../README.md) | Main project README |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Compiler architecture |
+| [documentation.md](documentation.md) | Compiler documentation |
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
+2. Create a branch (`git checkout -b feature/my-feature`)
+3. Make your changes
+4. Run tests (`cargo test`)
+5. Submit a PR
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](../LICENSE) for details.
+
+---
+
+**© 2026 Hint Language Team**
