@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/RePack-org/hint/main/assets/banner.png" alt="Hint Language" width="100%" />
+<img src="https://raw.githubusercontent.com/ratban/hint/main/assets/banner.png" alt="Hint Language" width="100%" />
 
 # Hint
 
