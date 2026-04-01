@@ -1,0 +1,93 @@
+# Rust
+/target/
+**/target/
+*.rlib
+*.rlib.rmeta
+*.rmeta
+*.pdb
+*.pdb.*
+*.dll
+*.dll.lib
+*.exp
+*.lib
+/target
+target
+
+# Build output
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.obj
+*.asm
+*.ilk
+*.s
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# VS Code Extension
+out/
+*.vsix
+.vscode-test/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.orig
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Test artifacts
+coverage/
+*.gcno
+*.gcda
+*.gcov
+*.profraw
+*.profdata
+profiler.out
+
+# Implementation plans and docs (keep only final docs)
+ARCHITECTURE.md
+IMPLEMENTATION_PLAN.md
+*.plan.md
+*.draft.md
+
+# Build artifacts
+dist/
+build/
+
+# Lock files (keep Cargo.lock for reproducibility)
+# Cargo.lock
+
+# Benchmark results
+criterion/
+
+# Fuzzing
+corpus/
+artifacts/
+
+# Documentation build
+doc/

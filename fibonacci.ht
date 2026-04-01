@@ -1,0 +1,8 @@
+Say "Computing Fibonacci sequence...".
+Keep the number 0 in mind as the first.
+Keep the number 1 in mind as the second.
+Keep the number 10 in mind as the count.
+Say "First 10 Fibonacci numbers:".
+Say "0".
+Say "1".
+Stop the program.
