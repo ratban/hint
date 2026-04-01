@@ -1,8 +1,8 @@
-<div align="center">
+<div align="Left">
 
 <img src="https://raw.githubusercontent.com/ratban/hint/refs/heads/main/assests/Banner.png" alt="Hint Language" width="50%" />
 
-# Hint
+<img src="https://raw.githubusercontent.com/ratban/hint/refs/heads/main/assests/Layer%202.png" alt="Hint Language" width="50%" /> # Hint
 
 **Code like you think. Run like a machine.**
 
