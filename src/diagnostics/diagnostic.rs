@@ -64,7 +64,13 @@ impl Span {
     }
     
     pub fn empty() -> Self {
-        Self { start: 0, end: 0 }
+        // Use usize::MAX to indicate an invalid/unset span
+        Self { start: usize::MAX, end: usize::MAX }
+    }
+    
+    /// Check if this span is valid (not empty/default)
+    pub fn is_valid(&self) -> bool {
+        self.start != usize::MAX && self.end != usize::MAX
     }
     
     pub fn merge(self, other: Span) -> Span {

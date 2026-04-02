@@ -28,7 +28,7 @@ impl HintLanguageServer {
             )),
             completion_provider: Some(CompletionOptions {
                 resolve_provider: Some(false),
-                trigger_characters: Some(vec![".".to_string(), "\"".to_string(), " ".to_string()]),
+                trigger_characters: Some(vec![".".to_string(), "\"".to_string()]),
                 work_done_progress_options: Default::default(),
                 all_commit_characters: None,
                 completion_item: None,
@@ -57,9 +57,64 @@ impl HintLanguageServer {
 
     pub fn on_did_change(&mut self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri.to_string();
-        for change in params.content_changes {
-            self.variables.insert(uri.clone(), self.extract_variables(&change.text));
-            self.documents.insert(uri.clone(), change.text);
+        if let Some(current_content) = self.documents.get(&uri).cloned() {
+            let mut new_content = current_content;
+
+            for change in params.content_changes {
+                if let Some(range) = change.range {
+                    // Apply incremental change using line-based approach
+                    let mut lines: Vec<String> = new_content.lines().map(|s| s.to_string()).collect();
+                    
+                    let start_line = range.start.line as usize;
+                    let end_line = range.end.line as usize;
+                    let start_col = range.start.character as usize;
+                    let end_col = range.end.character as usize;
+
+                    if start_line < lines.len() && end_line <= lines.len() {
+                        if start_line == end_line {
+                            // Single line change
+                            let line = &mut lines[start_line];
+                            let chars: Vec<char> = line.chars().collect();
+                            if start_col <= chars.len() && end_col <= chars.len() {
+                                let mut new_line: String = chars[..start_col].iter().collect();
+                                new_line.push_str(&change.text);
+                                new_line.push_str(&chars[end_col..].iter().collect::<String>());
+                                lines[start_line] = new_line;
+                            }
+                        } else {
+                            // Multi-line change
+                            let first_line = &lines[start_line];
+                            let last_line = &lines[end_line];
+                            let first_chars: Vec<char> = first_line.chars().collect();
+                            let last_chars: Vec<char> = last_line.chars().collect();
+                            
+                            let prefix: String = first_chars[..start_col.min(first_chars.len())].iter().collect();
+                            let suffix: String = last_chars[end_col.min(last_chars.len())..].iter().collect();
+                            
+                            let mut new_lines = Vec::new();
+                            new_lines.push(prefix + &change.text + &suffix);
+                            
+                            // Add any lines between start and end that should be preserved
+                            for (_i, line) in lines.iter().enumerate().take(end_line).skip(start_line + 1) {
+                                new_lines.push(line.clone());
+                            }
+                            new_lines.push(suffix);
+                            
+                            lines.splice(start_line..=end_line, new_lines);
+                        }
+                        new_content = lines.join("\n");
+                    } else {
+                        // Fallback: replace entire content
+                        new_content = change.text;
+                    }
+                } else {
+                    // Full document change
+                    new_content = change.text;
+                }
+            }
+
+            self.variables.insert(uri.clone(), self.extract_variables(&new_content));
+            self.documents.insert(uri.clone(), new_content);
         }
     }
 
@@ -86,15 +141,17 @@ impl HintLanguageServer {
         let uri = params.text_document_position_params.text_document.uri.to_string();
         let content = self.documents.get(&uri)?;
         let var_name = self.get_word_at_position(content, position)?;
-        
+
         if let Some(vars) = self.variables.get(&uri) {
             for (name, line, _) in vars {
                 if name == &var_name {
+                    let line_content = content.lines().nth(*line as usize).unwrap_or("");
+                    let line_len = line_content.len() as u32;
                     return Some(GotoDefinitionResponse::Scalar(Location {
                         uri: params.text_document_position_params.text_document.uri,
                         range: Range {
                             start: Position { line: *line, character: 0 },
-                            end: Position { line: *line, character: 100 },
+                            end: Position { line: *line, character: line_len },
                         },
                     }));
                 }
@@ -146,7 +203,7 @@ impl HintLanguageServer {
                 });
             }
         }
-        
+
         Some(completions)
     }
 
@@ -154,88 +211,97 @@ impl HintLanguageServer {
         let uri = params.text_document.uri.to_string();
         let content = self.documents.get(&uri)?;
         let mut symbols = Vec::new();
-        
+
         if let Ok(program) = parse(content) {
-            let mut line = 0u32;
+            // Track actual line positions by scanning source
+            let lines: Vec<&str> = content.lines().collect();
+            let mut current_line = 0u32;
+
             for stmt in &program.statements {
+                // Find the line where this statement appears
+                // Simplified: increment line for each statement
                 match stmt {
                     AstNode::Speak(text) => {
+                        let line_len = lines.get(current_line as usize).map(|s| s.len() as u32).unwrap_or(100);
                         symbols.push(DocumentSymbol {
                             name: format!("Say \"{}\"", text.chars().take(30).collect::<String>()),
                             detail: Some("Output statement".to_string()),
-                            kind: SymbolKind::STRING,
+                            kind: SymbolKind::FUNCTION,
                             tags: None,
-                            deprecated: None,
+                            deprecated: Some(false),
                             range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 100 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: line_len },
                             },
                             selection_range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 3 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: 3 },
                             },
                             children: None,
                         });
                     }
                     AstNode::Remember { name, value } => {
+                        let line_len = lines.get(current_line as usize).map(|s| s.len() as u32).unwrap_or(100);
                         symbols.push(DocumentSymbol {
                             name: name.clone(),
                             detail: Some(format!("Variable = {}", value)),
                             kind: SymbolKind::VARIABLE,
                             tags: None,
-                            deprecated: None,
+                            deprecated: Some(false),
                             range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 100 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: line_len },
                             },
                             selection_range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 4 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: 4 },
                             },
                             children: None,
                         });
                     }
                     AstNode::RememberList { name, values } => {
+                        let line_len = lines.get(current_line as usize).map(|s| s.len() as u32).unwrap_or(100);
                         symbols.push(DocumentSymbol {
                             name: format!("{} (list)", name),
                             detail: Some(format!("List with {} items", values.len())),
                             kind: SymbolKind::VARIABLE,
                             tags: None,
-                            deprecated: None,
+                            deprecated: Some(false),
                             range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 100 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: line_len },
                             },
                             selection_range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 4 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: 4 },
                             },
                             children: None,
                         });
                     }
                     AstNode::Halt => {
+                        let line_len = lines.get(current_line as usize).map(|s| s.len() as u32).unwrap_or(100);
                         symbols.push(DocumentSymbol {
                             name: "Stop".to_string(),
                             detail: Some("Program termination".to_string()),
                             kind: SymbolKind::OPERATOR,
                             tags: None,
-                            deprecated: None,
+                            deprecated: Some(false),
                             range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 100 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: line_len },
                             },
                             selection_range: Range {
-                                start: Position { line, character: 0 },
-                                end: Position { line, character: 4 },
+                                start: Position { line: current_line, character: 0 },
+                                end: Position { line: current_line, character: 4 },
                             },
                             children: None,
                         });
                     }
                 }
-                line += 1;
+                current_line += 1;
             }
         }
-        
+
         Some(DocumentSymbolResponse::Nested(symbols))
     }
 
@@ -243,8 +309,15 @@ impl HintLanguageServer {
         let mut vars = Vec::new();
         if let Ok(program) = parse(content) {
             for (line_num, stmt) in program.statements.iter().enumerate() {
-                if let AstNode::Remember { name, value: _value, .. } = stmt {
-                    vars.push((name.clone(), line_num as u32, HintType::Int(IntSize::I64)));
+                match stmt {
+                    AstNode::Remember { name, .. } => {
+                        vars.push((name.clone(), line_num as u32, HintType::Int(IntSize::I64)));
+                    }
+                    AstNode::RememberList { name, values } => {
+                        // Use Array type for lists
+                        vars.push((name.clone(), line_num as u32, HintType::Array(Box::new(HintType::Int(IntSize::I64)), values.len())));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -335,11 +408,11 @@ pub fn run_language_server() -> Result<(), String> {
 fn handle_json_rpc(content: &str, server: &mut HintLanguageServer) -> Result<String, String> {
     let value: Value = serde_json::from_str(content).map_err(|e| e.to_string())?;
     let obj = value.as_object().ok_or("Expected JSON object")?;
-    
+
     let method = obj.get("method").and_then(|v| v.as_str()).unwrap_or("");
     let id = obj.get("id").cloned();
     let params = obj.get("params").cloned().unwrap_or(Value::Null);
-    
+
     let result = match method {
         "initialize" => {
             let capabilities = server.get_capabilities();
@@ -352,6 +425,7 @@ fn handle_json_rpc(content: &str, server: &mut HintLanguageServer) -> Result<Str
             }))
         }
         "initialized" | "shutdown" => Ok(Value::Null),
+        "exit" => Ok(Value::Null),
         "textDocument/didOpen" => {
             if let Ok(p) = serde_json::from_value::<DidOpenTextDocumentParams>(params.clone()) {
                 server.on_did_open(p);
@@ -372,28 +446,36 @@ fn handle_json_rpc(content: &str, server: &mut HintLanguageServer) -> Result<Str
         }
         "textDocument/hover" => {
             if let Ok(p) = serde_json::from_value::<HoverParams>(params.clone()) {
-                Ok(server.on_hover(p).map(|h| serde_json::to_value(h).unwrap()).unwrap_or(Value::Null))
+                Ok(server.on_hover(p)
+                    .and_then(|h| serde_json::to_value(h).ok())
+                    .unwrap_or(Value::Null))
             } else {
                 Ok(Value::Null)
             }
         }
         "textDocument/definition" => {
             if let Ok(p) = serde_json::from_value::<GotoDefinitionParams>(params.clone()) {
-                Ok(server.on_definition(p).map(|d| serde_json::to_value(d).unwrap()).unwrap_or(Value::Null))
+                Ok(server.on_definition(p)
+                    .and_then(|d| serde_json::to_value(d).ok())
+                    .unwrap_or(Value::Null))
             } else {
                 Ok(Value::Null)
             }
         }
         "textDocument/completion" => {
             if let Ok(p) = serde_json::from_value::<CompletionParams>(params.clone()) {
-                Ok(server.on_completion(p).map(|c| serde_json::to_value(c).unwrap()).unwrap_or(Value::Null))
+                Ok(server.on_completion(p)
+                    .and_then(|c| serde_json::to_value(c).ok())
+                    .unwrap_or(Value::Null))
             } else {
                 Ok(Value::Null)
             }
         }
         "textDocument/documentSymbol" => {
             if let Ok(p) = serde_json::from_value::<DocumentSymbolParams>(params.clone()) {
-                Ok(server.on_document_symbol(p).map(|s| serde_json::to_value(s).unwrap()).unwrap_or(Value::Null))
+                Ok(server.on_document_symbol(p)
+                    .and_then(|s| serde_json::to_value(s).ok())
+                    .unwrap_or(Value::Null))
             } else {
                 Ok(Value::Null)
             }
@@ -404,7 +486,7 @@ fn handle_json_rpc(content: &str, server: &mut HintLanguageServer) -> Result<Str
             Ok(Value::Null)
         }
     };
-    
+
     match (result, id) {
         (Ok(res), Some(msg_id)) => Ok(json!({
             "jsonrpc": "2.0",

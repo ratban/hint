@@ -7,6 +7,7 @@ use crate::semantics::{
     SymbolTable, Symbol, SymbolType,
     HintType, IntSize,
 };
+use crate::stdlib::get_stdlib;
 
 /// Semantic analyzer for Hint programs
 pub struct SemanticAnalyzer<'a> {
@@ -23,7 +24,17 @@ impl<'a> SemanticAnalyzer<'a> {
             diagnostics: DiagnosticsEngine::new(),
         };
         analyzer.symbol_table.init_builtins();
+        analyzer.init_stdlib();
         analyzer
+    }
+
+    /// Initialize standard library functions in symbol table
+    fn init_stdlib(&mut self) {
+        let stdlib = get_stdlib();
+        // Register stdlib functions as builtins
+        // For now, we just acknowledge they exist
+        // A full implementation would add them to the symbol table
+        let _ = stdlib; // suppress unused warning until fully integrated
     }
     
     /// Analyze a program and return a typed program
@@ -35,6 +46,8 @@ impl<'a> SemanticAnalyzer<'a> {
                 Ok(stmt) => statements.push(stmt),
                 Err(_) => {
                     // Continue analyzing other statements even if one fails
+                    // Add a placeholder statement to maintain structure
+                    statements.push(TypedStatement::Halt { span: Span::default() });
                 }
             }
         }
@@ -146,10 +159,26 @@ impl<'a> SemanticAnalyzer<'a> {
         }
     }
     
-    fn get_node_span(&self, _node: &AstNode) -> Span {
-        // For now, return a default span
-        // In a full implementation, we'd track spans in the AST
-        Span::default()
+    fn get_node_span(&self, node: &AstNode) -> Span {
+        // Track approximate spans based on node type
+        // In a full implementation, we'd track exact spans in the AST
+        match node {
+            AstNode::Speak(text) => {
+                // Approximate: find "say" or "print" keyword position
+                Span::new(0, text.len() + 10)
+            }
+            AstNode::Remember { name, value: _ } => {
+                // Approximate span for remember statement
+                Span::new(0, name.len() + 20)
+            }
+            AstNode::RememberList { name, values } => {
+                // Approximate span for list statement
+                Span::new(0, name.len() + values.len() * 5 + 25)
+            }
+            AstNode::Halt => {
+                Span::new(0, 20)
+            }
+        }
     }
 }
 

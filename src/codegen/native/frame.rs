@@ -39,7 +39,9 @@ impl StackFrame {
     
     pub fn allocate_local(&mut self, builder: &mut FunctionBuilder, name: &str, ty: Type) -> StackSlot {
         let size = ty.bytes() as u32;
-        let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 0));
+        // Use natural alignment based on type size (power of 2)
+        let align = size.trailing_zeros().max(1) as u32;
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, align));
         
         self.locals.push(LocalSlot {
             name: name.to_string(),
@@ -53,8 +55,10 @@ impl StackFrame {
     
     pub fn allocate_spill(&mut self, builder: &mut FunctionBuilder, ty: Type) -> StackSlot {
         let size = ty.bytes() as u32;
+        // Use natural alignment based on type size (power of 2)
+        let align = size.trailing_zeros().max(1) as u32;
         // Use ExplicitSlot instead of SpillSlot (API changed in 0.110)
-        let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, 0));
+        let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, size, align));
         
         self.spill_slots.push(SpillSlot { slot, ty, offset: 0 });
         slot

@@ -17,6 +17,10 @@ path = "src/lib.rs"
 name = "hintc"
 path = "src/main.rs"
 
+[[bin]]
+name = "hint"
+path = "src/hint.rs"
+
 [dependencies]
 # Cranelift for zero-dependency code generation
 cranelift = "0.110"

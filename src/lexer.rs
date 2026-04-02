@@ -254,10 +254,12 @@ impl Lexer {
         }
 
         // Check for float (decimal point followed by digits)
+        let mut is_float = false;
         if self.current_char() == Some('.') {
             if let Some(next_ch) = self.input.get(self.position + 1).copied() {
                 if next_ch.is_ascii_digit() {
                     // It's a float
+                    is_float = true;
                     num_str.push(self.advance().unwrap()); // consume '.'
                     while let Some(ch) = self.current_char() {
                         if ch.is_ascii_digit() {
@@ -267,15 +269,51 @@ impl Lexer {
                             break;
                         }
                     }
-                    
-                    return num_str.parse::<f64>()
-                        .map(Token::Float)
-                        .map_err(|_| LexError {
-                            message: format!("Number out of range: {}", num_str),
-                            position: start_pos,
-                        });
                 }
             }
+        }
+
+        // Check for scientific notation (e.g., 1e5, 1.0e5, 1E5)
+        if let Some(ch) = self.current_char() {
+            if ch == 'e' || ch == 'E' {
+                is_float = true;
+                num_str.push(ch);
+                self.advance();
+                
+                // Optional sign after exponent
+                if let Some(sign) = self.current_char() {
+                    if sign == '+' || sign == '-' {
+                        num_str.push(sign);
+                        self.advance();
+                    }
+                }
+                
+                // Must have at least one digit in exponent
+                if !matches!(self.current_char(), Some('0'..='9')) {
+                    return Err(LexError {
+                        message: "Invalid scientific notation: expected digit after 'e' or 'E'".to_string(),
+                        position: start_pos,
+                    });
+                }
+                
+                while let Some(ch) = self.current_char() {
+                    if ch.is_ascii_digit() {
+                        num_str.push(ch);
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if is_float {
+            return num_str.parse::<f64>()
+                .map(Token::Float)
+                .map_err(|_| LexError {
+                    message: format!("Number out of range: {}", num_str),
+                    position: start_pos,
+                });
         }
 
         // It's an integer
@@ -292,7 +330,8 @@ impl Lexer {
         let mut word = String::new();
 
         while let Some(ch) = self.current_char() {
-            if ch.is_alphabetic() || ch == '_' {
+            // Allow alphabetic characters, underscore, and digits after first char
+            if ch.is_alphabetic() || ch == '_' || (!word.is_empty() && ch.is_ascii_digit()) {
                 word.push(ch);
                 self.advance();
             } else {

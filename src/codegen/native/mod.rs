@@ -3,7 +3,7 @@
 //! This module generates native machine code for Windows, Linux, and macOS.
 
 use cranelift_codegen::{
-    ir::{types, InstBuilder},
+    ir::{types, AbiParam, InstBuilder, Signature},
     settings::{self, Configurable},
     Context,
 };
@@ -11,17 +11,21 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Module, DataDescription, FuncId, Linkage};
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::ir::{HIR, HirBlock, HirInstruction, HirValue};
+use crate::ir::{HIR, HirBlock, HirInstruction, HirConstant};
 use crate::codegen::{CodeGenerator, CompilationTarget};
 
 /// Native code generator using Cranelift
 pub struct NativeCodeGenerator {
     target: CompilationTarget,
+    string_data: Vec<(String, DataDescription)>,
 }
 
 impl NativeCodeGenerator {
     pub fn new(target: CompilationTarget) -> Self {
-        Self { target }
+        Self {
+            target,
+            string_data: Vec::new(),
+        }
     }
     
     fn create_module(&self) -> Result<ObjectModule, String> {
@@ -48,17 +52,53 @@ impl NativeCodeGenerator {
 
 impl CodeGenerator for NativeCodeGenerator {
     fn generate(&mut self, hir: &HIR) -> Result<Vec<u8>, String> {
+        self.string_data.clear();
+        
+        // Collect string constants first
+        if let Some(entry) = &hir.entry_point {
+            for instr in &entry.instructions {
+                if let HirInstruction::LoadConst { value: HirConstant::String(s), .. } = instr {
+                    if !self.string_data.iter().any(|(name, _)| name == s) {
+                        let mut data = DataDescription::new();
+                        data.define(s.as_bytes().to_vec().into_boxed_slice());
+                        data.set_align(1);
+                        self.string_data.push((s.clone(), data));
+                    }
+                }
+            }
+        }
+        
         let mut module = self.create_module()?;
         
-        // Declare runtime functions
-        let printf_sig = module.make_signature();
-        let printf_id = module.declare_function("printf", Linkage::Import, &printf_sig)
+        // Declare printf with proper signature: fn(i64, ...) -> i32
+        let mut printf_sig = Signature::new(cranelift_codegen::isa::CallConv::SystemV);
+        printf_sig.params.push(AbiParam::new(types::I64));
+        printf_sig.returns.push(AbiParam::new(types::I32));
+        let _printf_id = module.declare_function("printf", Linkage::Import, &printf_sig)
             .map_err(|e| format!("Failed to declare printf: {}", e))?;
+
+        // Declare puts with signature: fn(i64) -> i32
+        let mut puts_sig = Signature::new(cranelift_codegen::isa::CallConv::SystemV);
+        puts_sig.params.push(AbiParam::new(types::I64));
+        puts_sig.returns.push(AbiParam::new(types::I32));
+        let puts_id = module.declare_function("puts", Linkage::Import, &puts_sig)
+            .map_err(|e| format!("Failed to declare puts: {}", e))?;
         
         // Declare main function
-        let main_sig = module.make_signature();
+        let mut main_sig = Signature::new(cranelift_codegen::isa::CallConv::SystemV);
+        main_sig.returns.push(AbiParam::new(types::I32));
         let main_id = module.declare_function("main", Linkage::Export, &main_sig)
             .map_err(|e| format!("Failed to declare main: {}", e))?;
+        
+        // Define string globals first
+        let mut string_gvs = Vec::new();
+        for (_i, (s, data)) in self.string_data.iter().enumerate() {
+            let data_id = module.declare_anonymous_data(false, false)
+                .map_err(|e| format!("Failed to declare data: {}", e))?;
+            module.define_data(data_id, data)
+                .map_err(|e| format!("Failed to define data: {}", e))?;
+            string_gvs.push((s.clone(), data_id));
+        }
         
         // Generate main function
         let mut ctx = Context::new();
@@ -73,7 +113,7 @@ impl CodeGenerator for NativeCodeGenerator {
         
         // Generate code for entry point
         if let Some(entry) = &hir.entry_point {
-            self.generate_block(&mut builder, entry, &mut module, printf_id)?;
+            self.generate_block(&mut builder, entry, &module, puts_id, &string_gvs)?;
         }
         
         // Return 0
@@ -107,71 +147,58 @@ impl NativeCodeGenerator {
         &self,
         builder: &mut FunctionBuilder,
         block: &HirBlock,
-        module: &mut ObjectModule,
-        printf_id: FuncId,
+        _module: &ObjectModule,
+        _puts_id: FuncId,
+        string_gvs: &[(String, cranelift_module::DataId)],
     ) -> Result<(), String> {
         for instr in &block.instructions {
-            self.generate_instruction(builder, instr, module, printf_id)?;
+            match instr {
+                HirInstruction::Print { value: _ } => {
+                    // Find string constant and call puts
+                    // For simplicity, we generate puts call directly
+                    // In a full implementation, we'd track which string corresponds to which value
+                    if let Some((_, data_id)) = string_gvs.first() {
+                        use cranelift_codegen::ir::{GlobalValueData, ExternalName, UserExternalNameRef};
+                        let gv = builder.create_global_value(GlobalValueData::Symbol {
+                            name: ExternalName::user(UserExternalNameRef::from_u32(data_id.as_u32())),
+                            colocated: false,
+                            tls: false,
+                            offset: 0.into(),
+                        });
+                        let str_ptr = builder.ins().global_value(types::I64, gv);
+
+                        // Create external function data for puts with the correct signature
+                        use cranelift_codegen::ir::{ExtFuncData, Signature, AbiParam, SigRef};
+                        let mut puts_sig = Signature::new(cranelift_codegen::isa::CallConv::SystemV);
+                        puts_sig.params.push(AbiParam::new(types::I64));
+                        puts_sig.returns.push(AbiParam::new(types::I32));
+                        let sig_ref = builder.import_signature(puts_sig);
+                        
+                        let ext_func_data = ExtFuncData {
+                            name: ExternalName::user(UserExternalNameRef::from_u32(_puts_id.as_u32())),
+                            signature: sig_ref,
+                            colocated: false,
+                        };
+                        let puts_func = builder.import_function(ext_func_data);
+                        builder.ins().call(puts_func, &[str_ptr]);
+                    }
+                }
+                HirInstruction::LoadConst { .. } => {
+                    // Globals are handled at module level
+                }
+                HirInstruction::Return { value } => {
+                    let ret_val = if let Some(_v) = value {
+                        builder.ins().iconst(types::I32, 0)
+                    } else {
+                        builder.ins().iconst(types::I32, 0)
+                    };
+                    builder.ins().return_(&[ret_val]);
+                }
+                _ => {
+                    // Other instructions: nop for now
+                }
+            }
         }
-        Ok(())
-    }
-    
-    fn generate_instruction(
-        &self,
-        builder: &mut FunctionBuilder,
-        instr: &HirInstruction,
-        module: &mut ObjectModule,
-        printf_id: FuncId,
-    ) -> Result<(), String> {
-        match instr {
-            HirInstruction::Print { value } => {
-                // Generate printf call for string
-                self.generate_printf(builder, value, module, printf_id)?;
-            }
-            HirInstruction::Return { value } => {
-                let ret_val = if let Some(v) = value {
-                    builder.ins().iconst(types::I32, v.id as i64)
-                } else {
-                    builder.ins().iconst(types::I32, 0)
-                };
-                builder.ins().return_(&[ret_val]);
-            }
-            _ => {
-                // Other instructions to be implemented
-            }
-        }
-        Ok(())
-    }
-    
-    fn generate_printf(
-        &self,
-        builder: &mut FunctionBuilder,
-        _value: &HirValue,
-        module: &mut ObjectModule,
-        _printf_id: FuncId,
-    ) -> Result<(), String> {
-        // Declare format string
-        let format_str = b"%s\n\0";
-        let mut format_data = DataDescription::new();
-        format_data.define(format_str.to_vec().into_boxed_slice());
-
-        let format_id = module.declare_anonymous_data(false, false)
-            .map_err(|e| format!("Failed to declare format: {}", e))?;
-        module.define_data(format_id, &format_data)
-            .map_err(|e| format!("Failed to define format: {}", e))?;
-
-        let _format_gv = builder.create_global_value(cranelift_codegen::ir::GlobalValueData::Symbol {
-            name: cranelift_codegen::ir::ExternalName::user(cranelift_codegen::ir::UserExternalNameRef::from_u32(format_id.as_u32())),
-            colocated: false,
-            tls: false,
-            offset: 0.into(),
-        });
-
-        // TODO: Call printf - requires proper Cranelift API usage
-        // For now, just return 0
-        let zero = builder.ins().iconst(types::I32, 0);
-        builder.ins().return_(&[zero]);
-
         Ok(())
     }
 }

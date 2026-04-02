@@ -30,10 +30,17 @@ pub enum CompilationTarget {
 }
 
 impl CompilationTarget {
+    /// Cached host triple to avoid repeated allocations
+    fn host_triple() -> &'static str {
+        use std::sync::OnceLock;
+        static HOST_TRIPLE: OnceLock<String> = OnceLock::new();
+        HOST_TRIPLE.get_or_init(|| target_lexicon::Triple::host().to_string()).as_str()
+    }
+
     /// Get the target triple string
     pub fn triple(&self) -> &'static str {
         match self {
-            CompilationTarget::Native => target_lexicon::Triple::host().to_string().leak() as &'static str,
+            CompilationTarget::Native => Self::host_triple(),
             CompilationTarget::WindowsX64 => "x86_64-pc-windows-msvc",
             CompilationTarget::WindowsArm64 => "aarch64-pc-windows-msvc",
             CompilationTarget::LinuxX64 => "x86_64-unknown-linux-gnu",

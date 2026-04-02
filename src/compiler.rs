@@ -1,5 +1,5 @@
 //! Compiler orchestration module.
-//! 
+//!
 //! Coordinates all phases of compilation from source to executable.
 
 use crate::lexer::tokenize;
@@ -79,7 +79,7 @@ impl Compiler {
             eprintln!("[hintc] Phase 1: Lexical analysis");
         }
         let tokens = tokenize(source).map_err(|e| {
-            diagnostics.emit(e.to_diagnostic(""));
+            diagnostics.emit(e.to_diagnostic(source));
             diagnostics.format("source")
         })?;
         

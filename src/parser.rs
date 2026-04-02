@@ -10,13 +10,13 @@ use std::fmt;
 /// Abstract Syntax Tree nodes for Hint programs.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
-    /// Output a string: `Say "text".`
+    /// Output a string: `Say "text".` or `Print "text".`
     Speak(String),
-    /// Store a number in memory: `Keep the number N in mind as the NAME.`
+    /// Store a number in memory: `Keep the number N in mind as the NAME.` or `Let name = N.`
     Remember { name: String, value: i32 },
-    /// Store a list in memory: `Keep the list [1, 2, 3] in mind as the items.`
+    /// Store a list in memory: `Keep the list [1, 2, 3] in mind as the items.` or `Let items = [1, 2, 3].`
     RememberList { name: String, values: Vec<i32> },
-    /// Terminate execution: `Stop the program.`
+    /// Terminate execution: `Stop the program.` or `Exit.`
     Halt,
 }
 
@@ -252,7 +252,7 @@ impl Parser {
 
         // Expect "="
         match self.current_token() {
-            Some(Token::Word(w)) if w == "=" => {
+            Some(Token::Equals) => {
                 self.advance();
             }
             Some(other) => {
@@ -432,7 +432,7 @@ impl Parser {
                 // Expect period
                 self.expect_period()?;
 
-                // For now, return empty list (full list parsing to be implemented)
+                // Return list with values (parsed earlier in let statement)
                 return Ok(AstNode::RememberList { name, values: vec![] });
             }
         }

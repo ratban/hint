@@ -7,12 +7,26 @@
 //!
 //! ```text
 //! hintc program.ht                    # Compile to native executable
-//! hintc program.ht --target wasm32    # Compile to WebAssembly
+//! hintc program.ht --target wasm32    # Compile to WebAssembly (wasm32)
+//! hintc program.ht --target linux64   # Compile for Linux x86_64
+//! hintc program.ht --target windows64 # Compile for Windows x86_64
+//! hintc program.ht --target macos64   # Compile for macOS x86_64
 //! hintc program.ht -o output          # Custom output name
 //! hintc --ast program.ht              # Print AST
 //! hintc --ir program.ht               # Print IR
+//! hintc --tokens program.ht           # Print tokens
 //! hintc --lsp                         # Start language server
+//! hintc --repl                        # Start REPL (interactive mode)
 //! ```
+//!
+//! # Targets
+//!
+//! Available compilation targets:
+//! - `native` - Auto-detect host platform (default)
+//! - `windows64` - Windows x86_64
+//! - `linux64` - Linux x86_64
+//! - `macos64` - macOS x86_64
+//! - `wasm32` - WebAssembly 32-bit
 
 pub mod lexer;
 pub mod parser;
