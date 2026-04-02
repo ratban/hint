@@ -1,197 +1,111 @@
-# Hint Compiler
+<div align="Center">
 
-**Zero-dependency compiler for the Hint programming language.**
+<img src="https://raw.githubusercontent.com/ratban/hint/refs/heads/main/assests/Layer%202.png" alt="Hint Language" width="1.5%" /> **Hint**
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/hint-lang/hintc/releases)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](../LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/hint-lang/hintc/ci.yml)](https://github.com/hint-lang/hintc/actions)
+**Code like you think. Run like a machine.**
 
----
+[![Stars](https://img.shields.io/github/stars/RePack-org/hint?style=flat-square&color=black)](https://github.com/RePack-org/hint/stargazers)
+[![License](https://img.shields.io/badge/license-GPL--v3-black?style=flat-square)](LICENSE)
+[![Discord](https://img.shields.io/badge/discord-join-black?style=flat-square&logo=discord)](https://discord.gg/EUadGxR5Nz)
+[![No Telemetry](https://img.shields.io/badge/telemetry-none%20ever-black?style=flat-square)](#)
 
-## 🚀 Overview
-
-The Hint compiler (`hintc`) compiles Hint source code to:
-- **WebAssembly** (`.wasm`) - For web browsers
-- **Native executables** (`.exe`, ELF, Mach-O) - For Windows, macOS, Linux
-
-**Written in Rust** using the Cranelift code generator.
+</div>
 
 ---
 
-## 📦 Installation
+## What is Hint?
 
-### From Source
+Hint is a programming language built for humans first, machines second.
 
-```bash
-git clone https://github.com/hint-lang/hintc.git
-cd hintc/hintc
-cargo build --release
+Every other language makes you learn *its* rules. Hint learns yours.
+
+Write code that sounds like English. Get binaries that run like C. No compromise.
+
+```hint
+Say "Hello, World!".
+Stop the program.
 ```
 
-The binary will be at `target/release/hintc` (or `hintc.exe` on Windows).
-
-### From npm (Coming Soon)
-
-```bash
-npm install -g hintc
-```
+That's it. That's a full program.
 
 ---
 
-## 🛠️ Usage
+## Why Hint?
 
-### Compile to WASM
+Most languages were designed by academics or corporations. Hint was built by a developer who was tired of the same tradeoffs.
 
-```bash
-hintc --target wasm32 input.ht -o output.wasm
-```
+**Powerful** — System-level access, memory safety, and native speed. No runtime. No GC pauses. No bloat.
 
-### Compile to Native
+**Simple** — If you can write a sentence in English, you can write Hint. The syntax gets out of your way and lets you think about the problem, not the language.
 
-```bash
-# Windows
-hintc --target native input.ht -o output.exe
+**Fullstack** — Frontend, backend, and everything in between. One language. One toolchain. One community.
 
-# Linux/macOS
-hintc --target native input.ht -o output
-```
+**Private** — Zero telemetry. Ever. We don't know you exist and we intend to keep it that way.
 
-### Run REPL
-
-```bash
-hintc --repl
-```
+**Free** — GPL v3. Nobody can ever take this proprietary. Not a company. Not a VC. Nobody.
 
 ---
 
-## 📁 Project Structure
+## See It in Action
 
-```
-hintc/
-├── src/
-│   ├── lexer.rs              # Tokenization
-│   ├── parser.rs             # AST generation
-│   ├── semantics/            # Type checking
-│   │   ├── mod.rs
-│   │   ├── types.rs
-│   │   ├── symbols.rs
-│   │   ├── checker.rs
-│   │   └── error.rs
-│   ├── ir/                   # Intermediate representation
-│   │   └── mod.rs
-│   ├── codegen/              # Code generation
-│   │   ├── mod.rs
-│   │   ├── wasm/             # WASM backend
-│   │   └── native/           # Native backend (Cranelift)
-│   ├── stdlib/               # Standard library
-│   │   ├── mod.rs
-│   │   ├── core.rs
-│   │   ├── io.rs
-│   │   ├── net.rs
-│   │   └── wasm.rs
-│   ├── diagnostics/          # Error messages
-│   │   ├── mod.rs
-│   │   ├── diagnostic.rs
-│   │   ├── engine.rs
-│   │   ├── codes.rs
-│   │   ├── suggestions.rs
-│   │   └── render.rs
-│   ├── lsp.rs                # Language server
-│   ├── compiler.rs           # Main compiler
-│   ├── target.rs             # Target abstraction
-│   ├── main.rs               # CLI entry
-│   └── lib.rs                # Library entry
-├── tests/                    # Test files
-├── Cargo.toml                # Dependencies
-└── README.md                 # This file
-```
+<div align="center">
+<img src="https://raw.githubusercontent.com/RePack-org/hint/main/assets/demo.gif" alt="Hint demo" width="80%" />
+</div>
 
 ---
 
-## 🧪 Testing
+## Built Different
 
-```bash
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test lexer
-
-# Run with output
-cargo test -- --nocapture
-```
-
-### Test Files
-
-Test `.ht` files are in the `tests/` folder:
-- `fibonacci.ht` - Fibonacci sequence
-- `hello_world.ht` - Hello World example
+| | Hint | Python | Rust | Go |
+|---|---|---|---|---|
+| English-like syntax | ✅ | ⚠️ | ❌ | ❌ |
+| Native speed | ✅ | ❌ | ✅ | ✅ |
+| Memory safe | ✅ | ✅ | ✅ | ⚠️ |
+| Zero telemetry | ✅ | ✅ | ✅ | ❌ |
+| Fullstack | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| FOSS forever | ✅ | ✅ | ✅ | ❌ |
 
 ---
 
-## 🏗️ Architecture
+## Community
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed compiler architecture.
+Hint is built in public, by the community, for the community.
 
-### Compilation Pipeline
+<div align="center">
 
-```
-┌─────────────┐
-│ Source (.ht)│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│    Lexer    │ → Tokens
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│   Parser    │ → AST
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Semantics  │ → Typed AST
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│     IR      │ → HIR
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Codegen    │ → WASM / Native
-└─────────────┘
-```
+[![Discord](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/EUadGxR5Nz)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/RePack-org/hint)
+[![Website](https://img.shields.io/badge/Website-Coming%20Soon-black?style=for-the-badge)](#)
+
+</div>
+
+Come talk about the language, share what you're building, report bugs, or just hang out.
 
 ---
 
-## 📚 Documentation
+## Support Hint
 
-| Document | Description |
-|----------|-------------|
-| [README.md](../README.md) | Main project README |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Compiler architecture |
-| [documentation.md](documentation.md) | Compiler documentation |
+Hint is completely free and always will be. No paid tiers. No enterprise licensing. No BS.
 
----
+If Hint has saved you time, or you believe in what we're building, consider supporting development:
 
-## 🤝 Contributing
+<div align="center">
 
-1. Fork the repo
-2. Create a branch (`git checkout -b feature/my-feature`)
-3. Make your changes
-4. Run tests (`cargo test`)
-5. Submit a PR
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/ratban)
+
+</div>
+
+Every contribution goes directly into making Hint better. No middlemen. No investors. Just the language.
 
 ---
 
-## 📄 License
+## License
 
-MIT License - See [LICENSE](../LICENSE) for details.
+GPL v3 — Free forever. See [LICENSE](LICENSE).
 
 ---
 
-**© 2026 Hint Language Team**
+<div align="center">
+<sub>Built with no compromises by <a href="https://github.com/ratban">ratban</a> and the Hint community.</sub>
+</div>
